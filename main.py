@@ -245,7 +245,7 @@ async def HW3_1(
 
 from pydantic import BaseModel
 
-class Item(BaseModel):
+class Item_HW3(BaseModel):
 	name: str
 	description: str
 	price: float
@@ -255,7 +255,7 @@ class Item(BaseModel):
 @app.put("/items/{item_id}")
 async def HW3_2(
 	item_id: Annotated[int, Path(ge=1, le=1000)],
-	item: Item,
+	item: Item_HW3,
 	q: Annotated[str | None, Query(min_length=3, max_length=50)] = None):
 	
 	results = {
@@ -955,7 +955,7 @@ async def HW4_2(
 class Offer_HW4(BaseModel):
 	name: str = Field(title="The name of the offer")
 	discount: float = Field(title="The discount percentage for the offer")
-	items: list[Item] = Field(title="A list of items included in the offer")
+	items: list[Item_HW4] = Field(title="A list of items included in the offer")
 
 @app.post("/offers/")
 async def HW4_3(offer_data: Annotated[Offer_HW4, Body()]):
@@ -1757,5 +1757,293 @@ async def HW5(
     if tax:
         results.update({"tax": tax})
     return results
+
+# endregion
+
+# region EP.22 Path Operation Configuration
+
+# region 	Part 1. Tags
+'''
+@app.post("/items/", tags=["items"])
+async def create_item(item: str):
+    return item
+
+@app.get("/items/", tags=["items"])
+async def read_items():
+    return "some items"
+
+@app.get("/users/", tags=["users"])
+async def read_users():
+    return "some users"
+
+@app.put("/user/items", tags=["users", "items"])
+async def add_items_for_user():
+    return "item of user"
+'''
+# endregion
+
+# region 	Part 2. Tags with Enums
+'''
+from enum import Enum
+
+class Tags_EP22_2(Enum):
+    items = "items"
+    users = "users"
+
+@app.get("/items/", tags=[Tags_EP22_2.items])
+async def get_items():
+    return ["Portal gun", "Plumbus"]
+
+
+@app.get("/users/", tags=[Tags_EP22_2.users])
+async def read_users():
+    return ["Rick", "Morty"]
+'''
+# endregion
+
+# region 	Part 3. Summary and description
+# function name will be showed in docs title if there is no summary set
+'''
+@app.get("/")
+async def path_operation_with_no_summary():
+    return {"msg": "Hello World"}
+
+@app.post(
+    "/items/",
+    summary="Create an item",
+    description="Create an item from user provided string",
+)
+async def create_item(item: str):
+    return item
+'''
+# endregion
+
+# region	Part 4. Description from docstring
+'''
+from pydantic import BaseModel
+
+class Item_EP22_4(BaseModel):
+    name: str
+    description: str | None = None
+    price: float
+    tax: float | None = None
+    tags: set[str] = set()
+
+@app.post("/items/", response_model=Item_EP22_4, summary="Create an item")
+async def create_item(item: Item_EP22_4):
+    """
+    Create an item with all the information:
+
+    - **name**: each item must have a name
+    - **description**: a long description
+    - **price**: required
+    - **tax**: if the item doesn't have tax, you can omit this
+    - **tags**: a set of unique tag strings for this item
+    """ # Note: 這非省略
+    return item
+'''
+# endregion
+
+# region	Part 5. Response description
+'''
+from pydantic import BaseModel
+
+class Item_EP22_5(BaseModel):
+    name: str
+    description: str | None = None
+    price: float
+    tax: float | None = None
+    tags: set[str] = set()
+
+@app.post(
+    "/items/",
+    response_model=Item_EP22_5,
+    summary="Create an item",
+    response_description="The created item",
+)
+async def create_item(item: Item_EP22_5):
+    """
+    Create an item with all the information:
+
+    - **name**: each item must have a name
+    - **description**: a long description
+    - **price**: required
+    - **tax**: if the item doesn't have tax, you can omit this
+    - **tags**: a set of unique tag strings for this item
+    """
+    return item
+'''
+# endregion
+
+# region	Part 6. Deprecate a operation
+'''
+@app.get("/items/", tags=["items"])
+async def read_items():
+    return [{"name": "Foo", "price": 42}]
+
+@app.get("/users/", tags=["users"])
+async def read_users():
+    return [{"username": "johndoe"}]
+
+@app.get("/elements/", tags=["items"], deprecated=True)
+async def read_elements():
+    return [{"item_id": "Foo"}]
+'''
+# endregion
+
+# endregion
+
+# region EP.23 JSON Compatible Encoder
+'''
+from datetime import datetime
+from fastapi.encoders import jsonable_encoder
+from pydantic import BaseModel
+
+fake_db = {}
+
+class Item_EP23(BaseModel):
+    title: str
+    timestamp: datetime
+    description: str | None = None
+
+@app.post("/items/{id}")
+async def update_item(id: str, item: Item_EP23):
+    print(item)
+    json_compatible_item_data = jsonable_encoder(item)
+    print(json_compatible_item_data)
+    fake_db[id] = json_compatible_item_data
+    return json_compatible_item_data
+'''
+# endregion
+
+# region EP.24 Body - Updates
+
+# region 	Part 1. Update replacing with PUT
+'''
+from fastapi.encoders import jsonable_encoder
+from pydantic import BaseModel
+
+class Item_EP24_1(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    price: float | None = None
+    tax: float = 10.5
+    tags: list[str] = []
+
+
+items = {
+    "foo": {"name": "Foo", "price": 50.2},
+    "bar": {"name": "Bar", "description": "The bartenders", "price": 62, "tax": 20.2},
+    "baz": {"name": "Baz", "description": None, "price": 50.2, "tax": 10.5, "tags": []},
+}
+
+
+@app.get("/items_EP24/{item_id}", response_model=Item_EP24_1)
+async def read_item(item_id: str):
+    return items[item_id]
+
+
+@app.put("/items_EP24/{item_id}", response_model=Item_EP24_1)
+async def update_item(item_id: str, item: Item_EP24_1):
+    update_item_encoded = jsonable_encoder(item)
+    items[item_id] = update_item_encoded
+    return update_item_encoded
+'''
+# endregion
+
+# region 	Part 2. Partial updates with PATCH
+'''
+from fastapi.encoders import jsonable_encoder
+from pydantic import BaseModel
+
+class Item_EP24_2(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    price: float | None = None
+    tax: float = 10.5
+    tags: list[str] = []
+
+
+items = {
+    "foo": {"name": "Foo", "price": 50.2},
+    "bar": {"name": "Bar", "description": "The bartenders", "price": 62, "tax": 20.2},
+    "baz": {"name": "Baz", "description": None, "price": 50.2, "tax": 10.5, "tags": []},
+}
+
+
+@app.get("/items_EP24_2/{item_id}", response_model=Item_EP24_2)
+async def read_item(item_id: str):
+    return items[item_id]
+
+
+@app.patch("/items_EP24_2/{item_id}", response_model=Item_EP24_2)
+async def update_item(item_id: str, item: Item_EP24_2):
+    stored_item_data = items[item_id]
+    stored_item_model = Item_EP24_2(**stored_item_data) # MyPy marks it as an error but it doesn't
+    update_data = item.dict(exclude_unset=True) # dict --new-version-> model_dump
+    updated_item = stored_item_model.copy(update=update_data) # copy --new-version-> model_copy
+    items[item_id] = jsonable_encoder(updated_item)
+    return updated_item
+'''
+# endregion
+
+# endregion
+
+# region Homework6
+from pydantic import Field
+
+class Author(BaseModel):
+    name: str
+    age: int = Field(ge=0)
+
+class Book(BaseModel):
+    title: str
+    author: Author
+    summary: str | None = None
+
+books = [
+	{"title": "Book 1", "author": {"name": "Author 1", "age": 30}, "summary": "I am Taiwanese"},
+	{"title": "Book 2", "author": {"name": "Author 2", "age": 40}, "summary": "I am Taiwanese 2"}
+]
+
+# region 1. GET /books/
+# Description: Create an endpoint to retrieve a list of books with details such as the title, author, and summary.
+@app.get("/books/")
+async def HW6_1_get_books(
+    book_id: int | None = None
+):
+    if book_id:
+        if book_id > len(books):
+            return JSONResponse(
+                status_code=status.HTTP_404_NOT_FOUND,
+                content={"message": "The book is not exit."}
+            )
+        return books[book_id - 1]
+    return books
+# endregion
+
+# region 2. POST /books/create_with_author/
+# Description**: Create an endpoint that allows adding a book with its author details.
+from fastapi.encoders import jsonable_encoder
+@app.post("/books/create_with_author/", response_model=Book)
+async def HW6_2_adding_book_with_it_author(
+	new_book_with_author_info: Book
+):
+    jsonable_encoder_book_data = jsonable_encoder(new_book_with_author_info)
+    book_id = len(books)
+    books.insert(book_id, jsonable_encoder_book_data)
+    return new_book_with_author_info
+# endregion
+
+# region 3. POST /books/
+@app.post("/books/", status_code=status.HTTP_201_CREATED)
+async def HW6_3_create_a_new_book(
+	new_book: Book
+):
+    jsonable_encoder_book_data = jsonable_encoder(new_book)
+    book_id = len(books)
+    books.insert(book_id, jsonable_encoder_book_data)
+    return new_book
+# endregion
 
 # endregion
